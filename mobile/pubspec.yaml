@@ -1,0 +1,90 @@
+name: muazzin
+description: Muazzin - Qibla, Salah, Quran | Islamic utility app for Bangladesh Muslims
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ── State management ────────────────────────────────────────────────────
+  flutter_riverpod: ^2.5.1
+
+  # ── Navigation ──────────────────────────────────────────────────────────
+  go_router: ^13.2.5
+
+  # ── Prayer time calculation (adhan-dart) ────────────────────────────────
+  adhan: ^1.1.1
+
+  # ── Maps (OpenStreetMap — no API key required) ──────────────────────────
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
+
+  # ── HTTP client ─────────────────────────────────────────────────────────
+  dio: ^5.4.3
+
+  # ── Offline storage ─────────────────────────────────────────────────────
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  shared_preferences: ^2.2.3
+
+  # ── Location / GPS ──────────────────────────────────────────────────────
+  geolocator: ^11.0.0
+  permission_handler: ^11.3.1
+
+  # ── Compass / sensors ───────────────────────────────────────────────────
+  flutter_compass: ^0.8.0
+  sensors_plus: ^5.0.1
+
+  # ── Push notifications ───────────────────────────────────────────────────
+  flutter_local_notifications: ^17.1.2
+  firebase_core: ^2.31.1
+  firebase_messaging: ^14.9.1
+
+  # ── Audio (Azan playback) ────────────────────────────────────────────────
+  just_audio: ^0.9.38
+  audio_session: ^0.1.21
+
+  # ── UI helpers ───────────────────────────────────────────────────────────
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  google_fonts: ^6.2.1
+
+  # ── Utilities ────────────────────────────────────────────────────────────
+  intl: ^0.19.0
+  hijri: ^2.0.1
+  url_launcher: ^6.2.6
+  share_plus: ^9.0.0
+  connectivity_plus: ^6.0.3
+  package_info_plus: ^8.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+  assets:
+    - assets/hadith/
+    - assets/audio/
+    - assets/fonts/
+    - assets/images/
+
+  fonts:
+    - family: NotoSansBengali
+      fonts:
+        - asset: assets/fonts/NotoSansBengali-Regular.ttf
+        - asset: assets/fonts/NotoSansBengali-Bold.ttf
+          weight: 700
+    - family: AmiriQuran
+      fonts:
+        - asset: assets/fonts/AmiriQuran-Regular.ttf
