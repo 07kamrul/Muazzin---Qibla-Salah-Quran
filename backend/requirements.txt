@@ -1,0 +1,26 @@
+Django==4.2.18
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-environ==0.11.2
+django-filter==24.3
+
+# Database
+psycopg2-binary==2.9.9
+# PostGIS support (requires GDAL/libgdal on system)
+# django.contrib.gis is included in Django itself
+
+# Prayer times calculation
+ephem==4.1.5
+
+# Async tasks
+celery==5.3.6
+redis==5.0.4
+
+# Firebase FCM
+firebase-admin==6.4.0
+
+# Utilities
+gunicorn==22.0.0
+whitenoise==6.7.0
+python-dateutil==2.9.0

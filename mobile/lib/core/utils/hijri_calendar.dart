@@ -1,4 +1,57 @@
-import 'package:hijri/hijri_calendar.dart';
+// Pure-Dart Hijri calendar — no external package required.
+// Uses the standard tabular Islamic calendar algorithm (JDN-based).
+
+/// Minimal drop-in for the hijri package's HijriCalendar.fromDate() API.
+class HijriCalendar {
+  HijriCalendar._(this.hYear, this.hMonth, this.hDay);
+
+  final int hYear;
+  final int hMonth;
+  final int hDay;
+
+  /// Convert a Gregorian [DateTime] to the corresponding Hijri date.
+  factory HijriCalendar.fromDate(DateTime date) {
+    final jdn = _gregorianToJdn(date.year, date.month, date.day);
+    final h   = _jdnToHijri(jdn);
+    return HijriCalendar._(h.$1, h.$2, h.$3);
+  }
+
+  // ── Algorithms ─────────────────────────────────────────────────────────────
+
+  /// Gregorian → Julian Day Number (proleptic Gregorian calendar).
+  static int _gregorianToJdn(int year, int month, int day) {
+    final a = (14 - month) ~/ 12;
+    final y = year + 4800 - a;
+    final m = month + 12 * a - 3;
+    return day +
+        (153 * m + 2) ~/ 5 +
+        365 * y +
+        y ~/ 4 -
+        y ~/ 100 +
+        y ~/ 400 -
+        32045;
+  }
+
+  /// Julian Day Number → Hijri (tabular Islamic calendar).
+  /// Algorithm from E.G. Richards, "Mapping Time" (Oxford University Press).
+  static (int year, int month, int day) _jdnToHijri(int jdn) {
+    int l = jdn - 1948440 + 10632;
+    final n = (l - 1) ~/ 10631;
+    l = l - 10631 * n + 354;
+    final j = ((10985 - l) ~/ 5316) * ((50 * l) ~/ 17719) +
+        (l ~/ 5670) * ((43 * l) ~/ 15238);
+    l = l -
+        ((30 - j) ~/ 15) * ((17719 * j) ~/ 50) -
+        (j ~/ 16) * ((15238 * j) ~/ 43) +
+        29;
+    final year  = 30 * n + j - 30;
+    final month = (24 * l) ~/ 709;
+    final day   = l - (709 * month) ~/ 24;
+    return (year, month, day);
+  }
+}
+
+// ── Public model & utilities ─────────────────────────────────────────────────
 
 /// Hijri date model returned by [HijriCalendarUtil].
 class HijriDate {
@@ -53,11 +106,11 @@ class HijriCalendarUtil {
     final h = HijriCalendar.fromDate(date);
     final m = h.hMonth; // 1-indexed
     return HijriDate(
-      day:            h.hDay,
-      month:          m,
-      year:           h.hYear,
-      monthNameBn:    monthsBn[m - 1],
-      monthNameEn:    monthsEn[m - 1],
+      day:             h.hDay,
+      month:           m,
+      year:            h.hYear,
+      monthNameBn:     monthsBn[m - 1],
+      monthNameEn:     monthsEn[m - 1],
       monthNameArabic: monthsAr[m - 1],
     );
   }

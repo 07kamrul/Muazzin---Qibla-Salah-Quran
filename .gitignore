@@ -59,3 +59,10 @@ Thumbs.db
 .idea/
 .vscode/
 *.iml
+backend/CLAUDE.md
+.gitignore
+.gitignore
+backend/apps/hadith/CLAUDE.md
+backend/apps/CLAUDE.md
+backend/apps/notifications/CLAUDE.md
+*.md
