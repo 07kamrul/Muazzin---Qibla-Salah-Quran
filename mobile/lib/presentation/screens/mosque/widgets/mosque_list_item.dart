@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/utils/formatting.dart';
 import '../../../../data/models/mosque_model.dart';
 
 class MosqueListItem extends StatelessWidget {
@@ -21,44 +20,46 @@ class MosqueListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isBn  = lang == 'bn';
+    final addr  = (isBn ? mosque.addressBn : mosque.addressEn) ??
+        [mosque.upazila, mosque.district]
+            .where((s) => s.isNotEmpty)
+            .join(', ');
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: isSelected
-            ? AppColors.primaryGreen.withOpacity(0.08)
-            : theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
+        gradient: isSelected
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0x281F5C3A), AppColors.sky3],
+              )
+            : null,
+        color: isSelected ? null : AppColors.sky3,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isSelected ? AppColors.primaryGreen : Colors.transparent,
-          width: 1.5,
+          color: isSelected
+              ? AppColors.domeBd
+              : AppColors.goldBd.withOpacity(0.4),
+          width: isSelected ? 1.5 : 0.8,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(13),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header row: name + verification badge + distance
               Row(
                 children: [
-                  // Pin icon
                   Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: mosque.pinColor.withOpacity(0.12),
                       shape: BoxShape.circle,
@@ -67,7 +68,6 @@ class MosqueListItem extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
 
-                  // Name + verification
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -77,28 +77,31 @@ class MosqueListItem extends StatelessWidget {
                             Flexible(
                               child: Text(
                                 isBn ? mosque.nameBn : mosque.nameEn,
-                                style: theme.textTheme.titleSmall?.copyWith(
+                                style: TextStyle(
+                                  fontFamily: 'NotoSansBengali',
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w700,
                                   color: isSelected
-                                      ? AppColors.primaryGreen
-                                      : null,
+                                      ? AppColors.domePale
+                                      : AppColors.marble,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 5),
                             _VerificationBadge(
                               status: mosque.verificationStatus,
                               isBn: isBn,
                             ),
                           ],
                         ),
-                        if (mosque.address.isNotEmpty)
+                        if (addr.isNotEmpty)
                           Text(
-                            mosque.address,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.textTheme.bodySmall?.color
-                                  ?.withOpacity(0.7),
+                            addr,
+                            style: const TextStyle(
+                              fontFamily: 'NotoSansBengali',
+                              fontSize: 11,
+                              color: AppColors.sandMid,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -107,29 +110,25 @@ class MosqueListItem extends StatelessWidget {
                     ),
                   ),
 
-                  // Distance
                   if (mosque.distanceKm != null)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          mosque.distanceText(isBn),
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: AppColors.primaryGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      mosque.distanceText(lang),
+                      style: const TextStyle(
+                        fontFamily: 'NotoSansBengali',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.domePale,
+                      ),
                     ),
                 ],
               ),
 
               // Jamat times (if available)
-              if (mosque.jamatTimes != null)
+              if (mosque.jamatTimes.hasAny)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: _JamatTimesRow(
-                    jamat: mosque.jamatTimes!,
+                    jamat: mosque.jamatTimes,
                     isBn: isBn,
                   ),
                 ),
@@ -171,12 +170,7 @@ class MosqueListItem extends StatelessWidget {
 
   bool _hasFacilities(MosqueModel m) {
     final f = m.facilities;
-    return f != null &&
-        (f.hasWomensSection ||
-            f.hasWuduFacility ||
-            f.hasAirConditioning ||
-            f.hasParking ||
-            f.isWheelchairAccessible);
+    return f.womensSection || f.wudu || f.ac || f.parking || f.wheelchair;
   }
 
   Future<void> _openDirections(MosqueModel m) async {
@@ -192,15 +186,9 @@ class MosqueListItem extends StatelessWidget {
   }
 
   void _shareMosque(BuildContext context, MosqueModel m, bool isBn) {
-    final text = isBn
-        ? '${m.nameBn}\n${m.address}\nhttps://www.google.com/maps?q=${m.latitude},${m.longitude}'
-        : '${m.nameEn}\n${m.address}\nhttps://www.google.com/maps?q=${m.latitude},${m.longitude}';
-    // Using clipboard as share_plus may need additional setup
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(isBn ? 'লিংক কপি হয়েছে' : 'Link copied')),
     );
-    // In production: Share.share(text);
-    _ = text;
   }
 }
 
@@ -215,9 +203,9 @@ class _VerificationBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, label) = switch (status) {
-      VerificationStatus.verified  => (AppColors.success, isBn ? '✓' : '✓'),
-      VerificationStatus.community => (AppColors.gold, isBn ? '★' : '★'),
-      VerificationStatus.unverified=> (Colors.grey, ''),
+      VerificationStatus.verified   => (AppColors.domePale, '✓'),
+      VerificationStatus.community  => (AppColors.goldWarm,  '★'),
+      VerificationStatus.unverified => (AppColors.sandMid,   ''),
     };
     if (label.isEmpty) return const SizedBox.shrink();
 
@@ -260,16 +248,18 @@ class _JamatTimesRow extends StatelessWidget {
       spacing: 6,
       runSpacing: 4,
       children: entries.map((e) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: AppColors.primaryGreen.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(6),
+          color: AppColors.domeGlow,
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(color: AppColors.domeBd),
         ),
         child: Text(
           '${e.key}: ${e.value}',
-          style: TextStyle(
-            fontSize: 11,
-            color: AppColors.primaryGreen,
+          style: const TextStyle(
+            fontFamily: 'NotoSansBengali',
+            fontSize: 10.5,
+            color: AppColors.domePale,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -288,18 +278,20 @@ class _FacilitiesRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final f = mosque.facilities!;
-    return Row(
+    final f = mosque.facilities;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
       children: [
-        if (f.hasWomensSection)
-          _FacilityChip(icon: Icons.wc, label: isBn ? 'মহিলা কক্ষ' : 'Women'),
-        if (f.hasWuduFacility)
+        if (f.womensSection)
+          _FacilityChip(icon: Icons.wc, label: isBn ? 'মহিলা' : 'Women'),
+        if (f.wudu)
           _FacilityChip(icon: Icons.water_drop, label: isBn ? 'অযু' : 'Wudu'),
-        if (f.hasAirConditioning)
+        if (f.ac)
           _FacilityChip(icon: Icons.ac_unit, label: 'AC'),
-        if (f.hasParking)
+        if (f.parking)
           _FacilityChip(icon: Icons.local_parking, label: isBn ? 'পার্কিং' : 'Parking'),
-        if (f.isWheelchairAccessible)
+        if (f.wheelchair)
           _FacilityChip(icon: Icons.accessible, label: isBn ? 'হুইলচেয়ার' : 'Accessible'),
       ],
     );
@@ -314,16 +306,20 @@ class _FacilityChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: Colors.grey),
-          const SizedBox(width: 2),
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 11, color: AppColors.sandMid),
+        const SizedBox(width: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: AppColors.sandMid,
+            fontFamily: 'NotoSansBengali',
+          ),
+        ),
+      ],
     );
   }
 }
@@ -343,17 +339,31 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 14),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        foregroundColor: AppColors.primaryGreen,
-        side: const BorderSide(color: AppColors.primaryGreen, width: 0.8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.domeGlow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.domeBd),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: AppColors.domePale),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontFamily: 'NotoSansBengali',
+                fontSize: 12,
+                color: AppColors.domePale,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -6,11 +6,34 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
+  // ── Haramain Night theme ──────────────────────────────────────────────────
+  static const Color sky0      = Color(0xFF07050C);
+  static const Color sky1      = Color(0xFF0D0A12);
+  static const Color sky2      = Color(0xFF110D16);
+  static const Color sky3      = Color(0xFF1C1520);
+  static const Color sky4      = Color(0xFF251C2A);
+  static const Color brass     = Color(0xFFB8882A);
+  static const Color dome      = Color(0xFF1F5C3A);
+  static const Color domeLight = Color(0xFF2D8A56);
+  static const Color domePale  = Color(0xFF3AAD6B);
+  static const Color domeBd    = Color(0x612D8A56);
+  static const Color domeGlow  = Color(0x381F5C3A);
+  static const Color goldWarm  = Color(0xFFE8C060);
+  static const Color goldBd    = Color(0x59D4A840);
+  static const Color goldGlow  = Color(0x2EE8C060);
+  static const Color goldPale  = Color(0xFFD4B870);
+  static const Color marble    = Color(0xFFF0EDE8);
+  static const Color sand      = Color(0xFFC8B898);
+  static const Color sandMid   = Color(0xFF907860);
+  static const Color sandDeep  = Color(0xFF4A3C2C);
+  static const Color ruby      = Color(0xFF7A1E2A);
+  static const Color rubyGlow  = Color(0x407A1E2A);
+
   // ── Brand ────────────────────────────────────────────────────────────────
   static const Color primaryGreen      = Color(0xFF1B4332);
   static const Color primaryGreenLight = Color(0xFF2D6A4F);
   static const Color primaryGreenDark  = Color(0xFF0A2618);
-  static const Color gold              = Color(0xFFD4AF37);
+  static const Color gold              = Color(0xFFD4A840);
   static const Color goldLight         = Color(0xFFE8C547);
   static const Color cream             = Color(0xFFF5F0E8);
   static const Color white             = Color(0xFFFFFFFF);

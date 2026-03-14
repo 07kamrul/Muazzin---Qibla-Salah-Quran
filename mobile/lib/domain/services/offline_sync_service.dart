@@ -18,9 +18,6 @@ final offlineSyncServiceProvider = Provider<OfflineSyncService>((ref) {
 
 // ── Sync service ──────────────────────────────────────────────────────────────
 
-/// Handles background synchronization between the local SQLite cache
-/// and the remote Django API. Follows offline-first: local data is
-/// always shown immediately; sync runs in the background when online.
 class OfflineSyncService {
   OfflineSyncService(this._api);
 
@@ -28,94 +25,54 @@ class OfflineSyncService {
 
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
-  // ── Initialization ──────────────────────────────────────────────────────────
-
-  /// Start listening for connectivity changes and trigger sync on reconnect.
   Future<void> initialize() async {
-    _connectivitySub = Connectivity()
-        .onConnectivityChanged
-        .listen((results) async {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) async {
       final isOnline = results.any(
         (r) => r == ConnectivityResult.mobile || r == ConnectivityResult.wifi,
       );
-      if (isOnline) {
-        await syncAll();
-      }
+      if (isOnline) await syncAll();
     });
 
-    // Run initial sync if online
     final result = await Connectivity().checkConnectivity();
     if (result != ConnectivityResult.none) {
       unawaited(syncAll());
     }
   }
 
-  void dispose() {
-    _connectivitySub?.cancel();
-  }
+  void dispose() => _connectivitySub?.cancel();
 
-  // ── Full sync ───────────────────────────────────────────────────────────────
-
-  /// Sync everything that is stale. Safe to call repeatedly — each sync
-  /// method checks its own freshness condition.
   Future<void> syncAll() async {
-    await Future.wait([
-      syncHadiths(),
-      syncQuranMetadata(),
-    ]);
+    await Future.wait([syncHadiths(), syncQuranMetadata()]);
   }
 
-  // ── Hadith sync ─────────────────────────────────────────────────────────────
-
-  /// Downloads all 365 Hadiths from the backend if not already cached.
   Future<void> syncHadiths() async {
     try {
-      final count = await DatabaseHelper.instance.getHadithCount();
-      if (count >= 365) return; // Already have full set
-
+      final lastDate = await PreferencesHelper.instance.loadLastHadithDate();
+      if (lastDate != null) {
+        final today = DateTime.now();
+        if (lastDate.year == today.year &&
+            lastDate.month == today.month &&
+            lastDate.day == today.day) return;
+      }
       final raw  = await _api.getHadiths();
       final list = raw.map(HadithModel.fromJson).toList();
-      await DatabaseHelper.instance.insertHadiths(list);
-    } catch (e) {
-      // Network error — hadiths.json bundled asset is the fallback
-      // (loaded separately in main.dart during initialization)
-    }
+      await DatabaseHelper.instance.saveHadiths(list);
+      await PreferencesHelper.instance.saveLastHadithDate(DateTime.now());
+    } catch (_) {}
   }
 
-  // ── Quran metadata sync ─────────────────────────────────────────────────────
+  // Quran data is served from API on demand; no local DB caching needed.
+  Future<void> syncQuranMetadata() async {}
 
-  /// Downloads Surah metadata (no ayahs) if not already cached.
-  Future<void> syncQuranMetadata() async {
-    try {
-      final count = await DatabaseHelper.instance.getSurahCount();
-      if (count >= 114) return; // Already complete
-
-      final raw   = await _api.getSurahs();
-      final surahs = raw.map(SurahModel.fromJson).toList();
-      await DatabaseHelper.instance.insertSurahs(surahs);
-    } catch (e) {
-      // Silently fail — ayahs will be fetched on demand per surah
-    }
-  }
-
-  // ── Surah ayahs on-demand ───────────────────────────────────────────────────
-
-  /// Fetch + cache a single surah's ayahs from the API.
-  /// Returns null on failure (caller should use local cache if any).
   Future<SurahModel?> fetchAndCacheSurah(int surahNumber) async {
     try {
-      final raw   = await _api.getSurah(surahNumber);
-      final surah = SurahModel.fromJson(raw);
-      await DatabaseHelper.instance.insertSurahWithAyahs(surah);
-      return surah;
-    } catch (e) {
+      final raw = await _api.getSurah(surahNumber);
+      return SurahModel.fromJson(raw);
+    } catch (_) {
       return null;
     }
   }
 
-  // ── Mosque sync ─────────────────────────────────────────────────────────────
-
-  /// Downloads mosques near [lat]/[lng] if the local cache is stale (>24 h).
   Future<void> syncMosquesNearby({
     required double lat,
     required double lng,
@@ -123,44 +80,18 @@ class OfflineSyncService {
   }) async {
     try {
       final lastSync = await PreferencesHelper.instance.getMosqueSyncTime();
-      if (lastSync != null) {
-        final age = DateTime.now().difference(lastSync).inHours;
-        if (age < 24) return; // Cache still fresh
-      }
+      if (lastSync != null &&
+          DateTime.now().difference(lastSync).inHours < 24) return;
 
       final raw     = await _api.getMosquesNearby(lat: lat, lng: lng, radiusKm: radiusKm);
       final mosques = raw.map(MosqueModel.fromJson).toList();
-      await DatabaseHelper.instance.upsertMosques(mosques);
+      await DatabaseHelper.instance.saveMosques(mosques);
       await PreferencesHelper.instance.setMosqueSyncTime(DateTime.now());
-    } catch (e) {
-      // Network error — local DB will be used
-    }
+    } catch (_) {}
   }
 
-  // ── Pending contributions ───────────────────────────────────────────────────
-
-  /// Upload any locally pending mosque contributions / jamat updates.
-  Future<void> uploadPendingContributions() async {
-    try {
-      final pending = await DatabaseHelper.instance.getPendingContributions();
-      for (final item in pending) {
-        if (item['type'] == 'mosque') {
-          await _api.submitMosque(item['data'] as Map<String, dynamic>);
-        } else if (item['type'] == 'jamat') {
-          await _api.updateJamatTimes(
-            item['mosque_id'] as int,
-            item['data'] as Map<String, dynamic>,
-          );
-        }
-        await DatabaseHelper.instance.markContributionSynced(item['id'] as int);
-      }
-    } catch (e) {
-      // Will retry next time connectivity is available
-    }
-  }
+  Future<void> uploadPendingContributions() async {}
 }
-
-// ── Connectivity check helper ─────────────────────────────────────────────────
 
 Future<bool> isOnline() async {
   final result = await Connectivity().checkConnectivity();

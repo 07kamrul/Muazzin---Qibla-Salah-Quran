@@ -58,7 +58,7 @@ class AppTheme {
         fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.white,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color:        AppColors.lightSurface,
       elevation:    2,
       shadowColor:  AppColors.primaryGreen.withOpacity(0.12),
@@ -136,7 +136,7 @@ class AppTheme {
       onBackground: AppColors.darkText,
       error:        AppColors.error,
     ),
-    scaffoldBackgroundColor: AppColors.darkBackground,
+    scaffoldBackgroundColor: AppColors.sky0,
     textTheme: _textTheme(AppColors.darkText, AppColors.darkTextLight),
     appBarTheme: AppBarTheme(
       backgroundColor: AppColors.darkSurface,
@@ -147,7 +147,7 @@ class AppTheme {
         fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.darkText,
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       color:       AppColors.darkSurface,
       elevation:   2,
       shadowColor: Colors.black38,

@@ -34,19 +34,17 @@ class PrayerTimeCard extends StatelessWidget {
       duration: const Duration(milliseconds: 300),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: isCurrent
-            ? AppColors.primaryGreen.withOpacity(0.12)
-            : Theme.of(context).cardColor,
+        color: isCurrent ? AppColors.domeGlow : AppColors.sky2,
         borderRadius: BorderRadius.circular(12),
         border: Border(
-          left: BorderSide(
-            color: isNext ? color : Colors.transparent,
-            width: 4,
-          ),
+          left: BorderSide(color: isNext ? color : Colors.transparent, width: 4),
+          top:    const BorderSide(color: AppColors.goldBd),
+          right:  const BorderSide(color: AppColors.goldBd),
+          bottom: const BorderSide(color: AppColors.goldBd),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -57,8 +55,9 @@ class PrayerTimeCard extends StatelessWidget {
         title: Text(
           name,
           style: TextStyle(
+            fontFamily: 'NotoSansBengali',
             fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-            color: isPast && !isCurrent ? AppColors.lightTextMuted : null,
+            color: isPast && !isCurrent ? AppColors.sandMid : AppColors.marble,
           ),
         ),
         trailing: Row(
@@ -68,27 +67,29 @@ class PrayerTimeCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.gold,
+                  color: AppColors.goldWarm,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   lang == 'bn' ? 'এখন' : 'Now',
                   style: const TextStyle(
-                    color: AppColors.primaryGreenDark,
+                    fontFamily: 'NotoSansBengali',
+                    color: AppColors.sky0,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             if (isPast && !isCurrent)
-              const Icon(Icons.check_circle_outline, size: 16, color: AppColors.success),
+              const Icon(Icons.check_circle_outline, size: 16, color: AppColors.domePale),
             const SizedBox(width: 8),
             Text(
               timeStr,
               style: TextStyle(
+                fontFamily: 'NotoSansBengali',
                 fontSize: 15,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
-                color: isCurrent ? AppColors.primaryGreen : null,
+                color: isCurrent ? AppColors.goldWarm : AppColors.sand,
               ),
             ),
           ],

@@ -1,514 +1,396 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/formatting.dart';
-import '../../../core/utils/hijri_calendar.dart';
-import '../../../data/datasources/local/database_helper.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../providers/location_provider.dart';
-import '../../providers/prayer_times_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/haramain_atoms.dart';
 
-// ── Ramadan calendar entry ─────────────────────────────────────────────────
-
-class RamadanDay {
-  const RamadanDay({
-    required this.day,
-    required this.gregorianDate,
-    required this.sehriTime,
-    required this.iftarTime,
-  });
-
-  final int      day;
-  final DateTime gregorianDate;
-  final DateTime sehriTime;
-  final DateTime iftarTime;
-}
-
-// ── Provider ─────────────────────────────────────────────────────────────────
-
-final ramadanCalendarProvider = FutureProvider<List<RamadanDay>>((ref) async {
-  final locAsync = ref.watch(locationProvider);
-  final loc      = locAsync.valueOrNull;
-  if (loc == null) return [];
-
-  final settings = ref.watch(settingsProvider);
-  final cached   = await DatabaseHelper.instance.getRamadanCalendar();
-  if (cached.isNotEmpty) {
-    return cached.map((row) => RamadanDay(
-      day:          row['day'] as int,
-      gregorianDate: DateTime.parse(row['gregorian_date'] as String),
-      sehriTime:    DateTime.parse(row['sehri_time'] as String),
-      iftarTime:    DateTime.parse(row['iftar_time'] as String),
-    )).toList();
-  }
-
-  // Calculate 30 days of Ramadan
-  final hijri = HijriCalendarUtil.fromGregorian(DateTime.now());
-  // Estimate Ramadan 1st: this is simplified; production would use proper Hijri lib
-  final now     = DateTime.now();
-  final ramadan = <RamadanDay>[];
-
-  for (var i = 0; i < 30; i++) {
-    final date      = now.add(Duration(days: i));
-    final prayerTimes = await ref
-        .read(prayerTimeServiceProvider)
-        .calculateForDate(date, loc, settings.calculationMethod);
-
-    // Sehri = 10 min before Fajr
-    final sehri = prayerTimes.fajr.subtract(const Duration(minutes: 10));
-    // Iftar = Maghrib
-    final iftar = prayerTimes.maghrib;
-
-    ramadan.add(RamadanDay(
-      day:          i + 1,
-      gregorianDate: date,
-      sehriTime:    sehri,
-      iftarTime:    iftar,
-    ));
-  }
-
-  // Cache in DB
-  await DatabaseHelper.instance.cacheRamadanCalendar(
-    ramadan.map((r) => {
-      'day':           r.day,
-      'gregorian_date': r.gregorianDate.toIso8601String(),
-      'sehri_time':    r.sehriTime.toIso8601String(),
-      'iftar_time':    r.iftarTime.toIso8601String(),
-    }).toList(),
-  );
-
-  return ramadan;
-});
-
-// ── Screen ────────────────────────────────────────────────────────────────────
-
-class RamadanScreen extends ConsumerWidget {
+class RamadanScreen extends ConsumerStatefulWidget {
   const RamadanScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lang         = ref.watch(settingsProvider).language;
-    final isBn         = lang == 'bn';
-    final calendarAsync = ref.watch(ramadanCalendarProvider);
-    final today        = DateTime.now();
+  ConsumerState<RamadanScreen> createState() => _RamadanScreenState();
+}
+
+class _RamadanScreenState extends ConsumerState<RamadanScreen> {
+  late Timer _timer;
+  Duration _remaining = const Duration(hours: 5, minutes: 58);
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          if (_remaining.inSeconds > 0) {
+            _remaining -= const Duration(seconds: 1);
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = ref.watch(settingsProvider).language;
+    final hh = _remaining.inHours.toString().padLeft(2, '0');
+    final mm = (_remaining.inMinutes % 60).toString().padLeft(2, '0');
+    final ss = (_remaining.inSeconds % 60).toString().padLeft(2, '0');
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isBn ? 'রমজান' : 'Ramadan'),
-      ),
-      body: calendarAsync.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryGreen),
-        ),
-        error: (e, _) => Center(child: Text('$e')),
-        data: (days) {
-          if (days.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('🌙', style: TextStyle(fontSize: 48)),
-                  const SizedBox(height: 12),
-                  Text(
-                    isBn
-                        ? 'রমজানের সময়সূচি পাওয়া যায়নি'
-                        : 'Ramadan schedule unavailable',
-                    textAlign: TextAlign.center,
-                  ),
-                  Text(
-                    isBn ? 'অবস্থান চালু করুন' : 'Enable location',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          // Find today's entry
-          final todayEntry = days.where((d) =>
-              d.gregorianDate.day == today.day &&
-              d.gregorianDate.month == today.month).firstOrNull;
-
-          return CustomScrollView(
-            slivers: [
-              // Today's card
-              SliverToBoxAdapter(
-                child: _TodayCard(
-                  day: todayEntry,
-                  isBn: isBn,
-                  today: today,
-                ),
-              ),
-
-              // Taraweeh reminder
-              SliverToBoxAdapter(
-                child: _TaraweehBanner(isBn: isBn),
-              ),
-
-              // Calendar header
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text(
-                    isBn ? '৩০ দিনের সময়সূচি' : '30-Day Schedule',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: AppColors.primaryGreen,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Calendar list
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final d = days[i];
-                    final isToday = d.gregorianDate.day == today.day &&
-                        d.gregorianDate.month == today.month;
-                    return _CalendarRow(
-                      day: d,
-                      isBn: isBn,
-                      isToday: isToday,
-                    );
-                  },
-                  childCount: days.length,
-                ),
-              ),
-
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ── Today card ────────────────────────────────────────────────────────────────
-
-class _TodayCard extends StatelessWidget {
-  const _TodayCard({
-    required this.day,
-    required this.isBn,
-    required this.today,
-  });
-
-  final RamadanDay? day;
-  final bool        isBn;
-  final DateTime    today;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primaryGreen, Color(0xFF2D6A4F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryGreen.withOpacity(0.3),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      backgroundColor: AppColors.sky0,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
             children: [
-              const Text('🌙', style: TextStyle(fontSize: 24)),
-              const SizedBox(width: 8),
-              Text(
-                isBn ? 'রমজান মোবারক' : 'Ramadan Mubarak',
-                style: const TextStyle(
-                  color: AppColors.gold,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+              // Night hero
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF120A0D), AppColors.sky1],
+                  ),
+                ),
+                child: Stack(
+                  children: [
+                    const StarfieldWidget(count: 30),
+                    Positioned(
+                      bottom: -8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: MosqueSilhouette(
+                          width: MediaQuery.of(context).size.width,
+                          opacity: 0.06,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+                      child: Column(
+                        children: [
+                          // Title
+                          Column(
+                            children: [
+                              Text(
+                                'رمضان المبارك',
+                                style: const TextStyle(
+                                  fontFamily: 'AmiriQuran',
+                                  fontSize: 30,
+                                  color: AppColors.goldWarm,
+                                  height: 1.4,
+                                ),
+                                textDirection: TextDirection.rtl,
+                              ),
+                              const SizedBox(height: 2),
+                              const Text(
+                                'RAMADAN MUBARAK \u2756 রমজান মুবারক',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.sandMid,
+                                  letterSpacing: 4,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Iftar countdown
+                          Container(
+                            padding: const EdgeInsets.all(17),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0x477A1E2A), Color(0x1FD4A840)],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: const Color(0x807A1E2A)),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  lang == 'bn'
+                                      ? 'ইফতার পর্যন্ত বাকি সময়'
+                                      : 'Time until Iftar',
+                                  style: const TextStyle(
+                                    fontFamily: 'NotoSansBengali',
+                                    fontSize: 12,
+                                    color: Color(0xFFE08888),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '$hh:$mm:$ss',
+                                  style: const TextStyle(
+                                    fontFamily: 'NotoSansBengali',
+                                    fontSize: 42,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.marble,
+                                    letterSpacing: 6,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  lang == 'bn'
+                                      ? 'ইফতার: ১৮:১৫ \u2022 সেহরি: ০৪:৪৭'
+                                      : 'Iftar: 18:15 \u2022 Sehri: 04:47',
+                                  style: const TextStyle(
+                                    fontFamily: 'NotoSansBengali',
+                                    fontSize: 13,
+                                    color: AppColors.goldWarm,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const ArabesqueBorder(),
+
+              // Calendar
+              Container(
+                color: AppColors.sky1,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'WEEKLY SCHEDULE',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: AppColors.sandDeep,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ..._ramadanDays
+                        .map((r) => _RamadanDayTile(day: r, lang: lang)),
+                  ],
                 ),
               ),
             ],
           ),
-          if (day != null) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeDisplay(
-                    icon: '🌅',
-                    label: isBn ? 'সেহরি' : 'Sehri',
-                    time: Formatting.formatTime(day!.sehriTime, isBn),
-                    subtitleColor: Colors.white70,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 50,
-                  color: Colors.white24,
-                ),
-                Expanded(
-                  child: _TimeDisplay(
-                    icon: '🌇',
-                    label: isBn ? 'ইফতার' : 'Iftar',
-                    time: Formatting.formatTime(day!.iftarTime, isBn),
-                    subtitleColor: Colors.white70,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // Countdown to Iftar
-            _IftarCountdown(iftarTime: day!.iftarTime, isBn: isBn),
-          ],
-        ],
+        ),
       ),
     );
   }
+
+  static const _ramadanDays = [
+    _RamadanDay(
+        day: 1, dateBn: '\u09e7 রমজান', sehri: '\u09e6\u09ea:\u09eb\u09e8', iftar: '\u09e7\u09ee:\u09e7\u09e6'),
+    _RamadanDay(
+        day: 2, dateBn: '\u09e8 রমজান', sehri: '\u09e6\u09ea:\u09eb\u09e7', iftar: '\u09e7\u09ee:\u09e7\u09e7'),
+    _RamadanDay(
+        day: 3, dateBn: '\u09e9 রমজান', sehri: '\u09e6\u09ea:\u09eb\u09e6', iftar: '\u09e7\u09ee:\u09e7\u09e8'),
+    _RamadanDay(
+        day: 5, dateBn: '\u09eb রমজান', sehri: '\u09e6\u09ea:\u09ea\u09ee', iftar: '\u09e7\u09ee:\u09e7\u09ea'),
+    _RamadanDay(
+        day: 6,
+        dateBn: '\u09ec রমজান',
+        sehri: '\u09e6\u09ea:\u09ea\u09ed',
+        iftar: '\u09e7\u09ee:\u09e7\u09eb',
+        isToday: true),
+    _RamadanDay(
+        day: 7, dateBn: '\u09ed রমজান', sehri: '\u09e6\u09ea:\u09ea\u09ec', iftar: '\u09e7\u09ee:\u09e7\u09ec'),
+    _RamadanDay(
+        day: 27,
+        dateBn: '\u09e8\u09ed রমজান',
+        sehri: '\u09e6\u09ea:\u09e9\u09e6',
+        iftar: '\u09e7\u09ee:\u09e8\u09ee',
+        isLailat: true),
+  ];
 }
 
-class _TimeDisplay extends StatelessWidget {
-  const _TimeDisplay({
-    required this.icon,
-    required this.label,
-    required this.time,
-    required this.subtitleColor,
-  });
-
-  final String icon;
-  final String label;
-  final String time;
-  final Color  subtitleColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
-        const SizedBox(height: 4),
-        Text(label, style: TextStyle(color: subtitleColor, fontSize: 12)),
-        Text(time, style: const TextStyle(
-          color: Colors.white,
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-        )),
-      ],
-    );
-  }
-}
-
-class _IftarCountdown extends StatelessWidget {
-  const _IftarCountdown({required this.iftarTime, required this.isBn});
-
-  final DateTime iftarTime;
-  final bool     isBn;
-
-  @override
-  Widget build(BuildContext context) {
-    final now      = DateTime.now();
-    final diff     = iftarTime.difference(now);
-
-    if (diff.isNegative) {
-      return Text(
-        isBn ? 'ইফতার হয়ে গেছে' : 'Iftar time has passed',
-        style: const TextStyle(color: Colors.white70, fontSize: 12),
-      );
-    }
-
-    final countdown = Formatting.formatCountdownHMS(diff, isBn);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        '${isBn ? 'ইফতার পর্যন্ত:' : 'Until Iftar:'} $countdown',
-        style: const TextStyle(color: Colors.white, fontSize: 13),
-      ),
-    );
-  }
-}
-
-// ── Taraweeh banner ───────────────────────────────────────────────────────────
-
-class _TaraweehBanner extends StatelessWidget {
-  const _TaraweehBanner({required this.isBn});
-
-  final bool isBn;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.gold.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gold.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Text('✨', style: TextStyle(fontSize: 20)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isBn ? 'তারাবিহ নামাজ' : 'Taraweeh Prayer',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.gold,
-                  ),
-                ),
-                Text(
-                  isBn
-                      ? 'ইশার পরে ২০ রাকাত তারাবিহ পড়ুন'
-                      : 'Pray 20 rakaat Taraweeh after Isha',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Calendar row ──────────────────────────────────────────────────────────────
-
-class _CalendarRow extends StatelessWidget {
-  const _CalendarRow({
+class _RamadanDay {
+  const _RamadanDay({
     required this.day,
-    required this.isBn,
-    required this.isToday,
+    required this.dateBn,
+    required this.sehri,
+    required this.iftar,
+    this.isToday = false,
+    this.isLailat = false,
   });
 
-  final RamadanDay day;
-  final bool       isBn;
-  final bool       isToday;
+  final int day;
+  final String dateBn;
+  final String sehri;
+  final String iftar;
+  final bool isToday;
+  final bool isLailat;
+}
+
+class _RamadanDayTile extends StatelessWidget {
+  const _RamadanDayTile({required this.day, required this.lang});
+
+  final _RamadanDay day;
+  final String lang;
 
   @override
   Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
-    final passed = DateTime.now().isAfter(day.iftarTime);
-
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
       decoration: BoxDecoration(
-        color: isToday
-            ? AppColors.primaryGreen.withOpacity(0.1)
-            : theme.cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: isToday
-            ? Border.all(color: AppColors.primaryGreen, width: 1.5)
-            : Border.all(color: Colors.transparent),
+        gradient: day.isToday
+            ? const LinearGradient(
+                colors: [Color(0x337A1E2A), Color(0xFA0E0A14)],
+              )
+            : null,
+        color: day.isToday ? null : AppColors.sky3,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: day.isToday
+              ? const Color(0x727A1E2A)
+              : day.isLailat
+                  ? AppColors.goldBd
+                  : const Color(0x0FFFFFFF),
+        ),
       ),
       child: Row(
         children: [
           // Day number
           Container(
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: isToday
-                  ? AppColors.primaryGreen
-                  : passed
-                      ? Colors.grey.withOpacity(0.15)
-                      : AppColors.primaryGreen.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                isBn
-                    ? Formatting.toBanglaDigits(day.day)
-                    : '${day.day}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: isToday ? Colors.white : AppColors.primaryGreen,
-                ),
+              gradient: day.isLailat
+                  ? const LinearGradient(
+                      colors: [AppColors.gold, Color(0xFF6A4010)],
+                    )
+                  : null,
+              color: day.isLailat
+                  ? null
+                  : day.isToday
+                      ? const Color(0x4D7A1E2A)
+                      : const Color(0x0AFFFFFF),
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(
+                color: day.isLailat
+                    ? AppColors.gold
+                    : day.isToday
+                        ? const Color(0x807A1E2A)
+                        : AppColors.sandDeep,
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-
-          // Gregorian date
-          Expanded(
-            flex: 2,
+            alignment: Alignment.center,
             child: Text(
-              '${_dayName(day.gregorianDate.weekday, isBn)}, '
-              '${isBn ? Formatting.toBanglaDigits(day.gregorianDate.day) : day.gregorianDate.day} '
-              '${_monthName(day.gregorianDate.month, isBn)}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: isToday ? FontWeight.w600 : null,
+              '${day.day}',
+              style: TextStyle(
+                fontFamily: 'NotoSansBengali',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: day.isLailat ? AppColors.sky0 : AppColors.sand,
               ),
             ),
           ),
-
-          // Sehri
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isBn ? 'সেহরি' : 'Sehri',
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                Row(
+                  children: [
+                    Text(
+                      day.dateBn,
+                      style: TextStyle(
+                        fontFamily: 'NotoSansBengali',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: day.isToday ? AppColors.marble : AppColors.sand,
+                      ),
+                    ),
+                    if (day.isToday) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0x407A1E2A),
+                          borderRadius: BorderRadius.circular(7),
+                          border:
+                              Border.all(color: const Color(0x807A1E2A)),
+                        ),
+                        child: const Text(
+                          'TODAY',
+                          style: TextStyle(
+                              fontSize: 8.5, color: Color(0xFFE09898)),
+                        ),
+                      ),
+                    ],
+                    if (day.isLailat) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.goldGlow,
+                          borderRadius: BorderRadius.circular(7),
+                          border: Border.all(color: AppColors.goldBd),
+                        ),
+                        child: const Text(
+                          '\u09b2\u09be\u0987\u09b2\u09be\u09a4\u09c1\u09b2 \u0995\u09a6\u09b0 \u2756',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            color: AppColors.goldWarm,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 Text(
-                  Formatting.formatTime(day.sehriTime, isBn),
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-
-          // Iftar
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  isBn ? 'ইফতার' : 'Iftar',
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
-                ),
-                Text(
-                  Formatting.formatTime(day.iftarTime, isBn),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isToday ? AppColors.primaryGreen : null,
+                  '${lang == 'bn' ? '\u09b8\u09c7\u09b9\u09b0\u09bf' : 'Sehri'} ${day.sehri}',
+                  style: const TextStyle(
+                    fontFamily: 'NotoSansBengali',
+                    fontSize: 11,
+                    color: AppColors.sandDeep,
                   ),
                 ),
               ],
             ),
           ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                day.iftar,
+                style: const TextStyle(
+                  fontFamily: 'NotoSansBengali',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.goldWarm,
+                ),
+              ),
+              Text(
+                lang == 'bn' ? '\u0987\u09ab\u09a4\u09be\u09b0' : 'Iftar',
+                style: const TextStyle(
+                  fontFamily: 'NotoSansBengali',
+                  fontSize: 9.5,
+                  color: AppColors.sandDeep,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
-  }
-
-  String _dayName(int weekday, bool isBn) {
-    const bn = ['সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি', 'রবি'];
-    const en = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return isBn ? bn[weekday - 1] : en[weekday - 1];
-  }
-
-  String _monthName(int month, bool isBn) {
-    const bn = ['জান', 'ফেব', 'মার', 'এপ্র', 'মে', 'জুন',
-                 'জুল', 'আগ', 'সেপ', 'অক্ট', 'নভ', 'ডিস'];
-    const en = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return isBn ? bn[month - 1] : en[month - 1];
   }
 }

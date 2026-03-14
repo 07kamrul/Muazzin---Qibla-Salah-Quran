@@ -21,104 +21,111 @@ class _HadithCardState extends State<HadithCard> {
     final h    = widget.hadith;
     final lang = widget.lang;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.gold.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gold.withOpacity(0.4)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
+    return GestureDetector(
+      onTap: () => setState(() => _expanded = !_expanded),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1C1508), AppColors.sky2],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.goldBd),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Green dome header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: [AppColors.dome, Color(0xFF112A1C)]),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.format_quote_rounded, color: AppColors.gold, size: 20),
-                  const SizedBox(width: 8),
                   Text(
                     lang == 'bn' ? 'আজকের হাদিস' : "Today's Hadith",
                     style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryGreen,
-                      fontSize: 14,
+                      fontFamily: 'NotoSansBengali',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.marble,
                     ),
                   ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.share_rounded, size: 18),
-                    onPressed: () => Share.share(
+                  GestureDetector(
+                    onTap: () => Share.share(
                       '${h.banglaTranslation}\n\n— ${h.source} #${h.hadithNumber}',
                     ),
+                    child: const Icon(Icons.share_rounded, color: AppColors.goldWarm, size: 18),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+            ),
 
-              // Arabic (only when expanded)
-              if (_expanded && h.arabicText != null) ...[
-                Text(
+            // Arabic
+            if (h.arabicText != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Text(
                   h.arabicText!,
                   textAlign: TextAlign.right,
                   textDirection: TextDirection.rtl,
                   style: const TextStyle(
                     fontFamily: 'AmiriQuran',
-                    fontSize: 20,
-                    height: 2.0,
-                    color: AppColors.primaryGreenDark,
+                    fontSize: 19,
+                    color: AppColors.marble,
+                    height: 2.1,
                   ),
                 ),
-                const Divider(height: 20),
-              ],
+              ),
 
-              // Bangla translation
-              AnimatedCrossFade(
+            const Divider(color: AppColors.goldBd, height: 1),
+
+            // Bangla
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: AnimatedCrossFade(
                 duration: const Duration(milliseconds: 250),
                 firstChild: Text(
                   _preview(h.banglaTranslation),
-                  style: const TextStyle(fontSize: 14, height: 1.6),
+                  style: const TextStyle(fontFamily: 'NotoSansBengali', fontSize: 13, color: AppColors.sand, height: 1.75),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
                 secondChild: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(h.banglaTranslation, style: const TextStyle(fontSize: 14, height: 1.6)),
-                    if (_expanded) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        h.englishTranslation,
-                        style: const TextStyle(fontSize: 13, color: AppColors.lightTextLight, height: 1.5),
-                      ),
-                    ],
+                    Text(h.banglaTranslation, style: const TextStyle(fontFamily: 'NotoSansBengali', fontSize: 13, color: AppColors.sand, height: 1.75)),
+                    const SizedBox(height: 8),
+                    Text(h.englishTranslation, style: const TextStyle(fontSize: 12, color: AppColors.sandMid, fontStyle: FontStyle.italic, height: 1.6)),
                   ],
                 ),
                 crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
               ),
+            ),
 
-              // Source
-              const SizedBox(height: 8),
-              Text(
-                '${h.source} — ${lang == 'bn' ? 'হাদিস' : 'Hadith'} #${h.hadithNumber}',
-                style: const TextStyle(fontSize: 12, color: AppColors.lightTextMuted),
-              ),
-
-              // Read more link
-              if (!_expanded)
-                TextButton(
-                  onPressed: () => setState(() => _expanded = true),
-                  style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 28)),
-                  child: Text(
-                    lang == 'bn' ? 'আরও পড়ুন' : 'Read more',
-                    style: const TextStyle(color: AppColors.primaryGreen, fontSize: 12),
+            // Source row
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${h.source} • ${lang == 'bn' ? 'হাদিস' : 'Hadith'} #${h.hadithNumber}',
+                    style: const TextStyle(fontFamily: 'AmiriQuran', fontSize: 12, color: AppColors.goldWarm),
                   ),
-                ),
-            ],
-          ),
+                  if (!_expanded)
+                    Text(
+                      lang == 'bn' ? 'আরও পড়ুন ›' : 'Read more ›',
+                      style: const TextStyle(fontFamily: 'NotoSansBengali', fontSize: 11, color: AppColors.domePale),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

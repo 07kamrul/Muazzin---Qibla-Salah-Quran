@@ -46,9 +46,9 @@ class MuazzinBottomNavBar extends ConsumerWidget {
     return BottomNavigationBar(
       currentIndex: currentIndex,
       onTap: onTap,
-      backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-      selectedItemColor:   isDark ? AppColors.gold : AppColors.primaryGreen,
-      unselectedItemColor: isDark ? AppColors.darkTextMuted : AppColors.lightTextMuted,
+      backgroundColor: AppColors.sky1,
+      selectedItemColor:   AppColors.goldWarm,
+      unselectedItemColor: AppColors.sandMid,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
       items: items.map((item) => BottomNavigationBarItem(

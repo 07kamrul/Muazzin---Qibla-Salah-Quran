@@ -131,7 +131,7 @@ class ApiClient {
   /// Refresh JWT access token.
   Future<String?> refreshToken() async {
     final prefs   = PreferencesHelper.instance;
-    final refresh = await prefs.getRefreshToken();
+    final refresh = await prefs.loadRefreshToken();
     if (refresh == null) return null;
 
     final response = await _dio.post<Map<String, dynamic>>(
@@ -140,7 +140,7 @@ class ApiClient {
     );
     final access = response.data?['access'] as String?;
     if (access != null) {
-      await prefs.setAccessToken(access);
+      await prefs.saveAuthToken(access);
     }
     return access;
   }
@@ -164,7 +164,7 @@ class _AuthInterceptor extends QueuedInterceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await PreferencesHelper.instance.getAccessToken();
+    final token = await PreferencesHelper.instance.loadAuthToken();
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
@@ -180,7 +180,7 @@ class _AuthInterceptor extends QueuedInterceptor {
       // Attempt token refresh once
       try {
         final prefs   = PreferencesHelper.instance;
-        final refresh = await prefs.getRefreshToken();
+        final refresh = await prefs.loadRefreshToken();
         if (refresh != null) {
           final dio = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
           final res = await dio.post<Map<String, dynamic>>(
@@ -189,7 +189,7 @@ class _AuthInterceptor extends QueuedInterceptor {
           );
           final newAccess = res.data?['access'] as String?;
           if (newAccess != null) {
-            await prefs.setAccessToken(newAccess);
+            await prefs.saveAuthToken(newAccess);
             // Retry original request
             err.requestOptions.headers['Authorization'] = 'Bearer $newAccess';
             final retryDio = Dio();
@@ -199,7 +199,7 @@ class _AuthInterceptor extends QueuedInterceptor {
         }
       } catch (_) {
         // Refresh failed — clear tokens
-        await PreferencesHelper.instance.clearTokens();
+        await PreferencesHelper.instance.clearAuthToken();
       }
     }
     handler.next(err);

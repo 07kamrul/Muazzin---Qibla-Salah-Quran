@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../data/datasources/local/database_helper.dart';
 import '../../../data/models/hadith_model.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/haramain_atoms.dart';
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
@@ -23,15 +24,24 @@ class HadithDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isBn = ref.watch(settingsProvider).language == 'bn';
+    final isBn       = ref.watch(settingsProvider).language == 'bn';
     final hadithAsync = ref.watch(hadithDetailProvider(hadithId));
 
     return Scaffold(
+      backgroundColor: AppColors.sky0,
       appBar: AppBar(
-        title: Text(isBn ? 'হাদিস' : 'Hadith'),
+        backgroundColor: AppColors.sky1,
+        iconTheme: const IconThemeData(color: AppColors.goldWarm),
+        title: Text(
+          isBn ? 'হাদিস' : 'Hadith',
+          style: const TextStyle(
+            fontFamily: 'NotoSansBengali',
+            color: AppColors.marble,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.copy),
+            icon: const Icon(Icons.copy, color: AppColors.goldWarm),
             tooltip: isBn ? 'কপি করুন' : 'Copy',
             onPressed: () => hadithAsync.whenData((h) {
               if (h == null) return;
@@ -46,13 +56,19 @@ class HadithDetailScreen extends ConsumerWidget {
         ],
       ),
       body: hadithAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen)),
-        error: (e, _) => Center(child: Text('$e')),
+        loading: () => const Center(
+          child: CircularProgressIndicator(color: AppColors.goldWarm),
+        ),
+        error: (e, _) => Center(
+          child: Text('$e', style: const TextStyle(color: AppColors.sandMid)),
+        ),
         data: (hadith) {
           if (hadith == null) {
             return Center(
-              child: Text(isBn ? 'হাদিস পাওয়া যায়নি' : 'Hadith not found'),
+              child: Text(
+                isBn ? 'হাদিস পাওয়া যায়নি' : 'Hadith not found',
+                style: const TextStyle(color: AppColors.sandMid),
+              ),
             );
           }
           return _HadithBody(hadith: hadith, isBn: isBn);
@@ -63,12 +79,8 @@ class HadithDetailScreen extends ConsumerWidget {
 
   String _buildShareText(HadithModel h, bool isBn) {
     final parts = <String>[];
-    if (h.textArabic != null) parts.add(h.textArabic!);
-    if (isBn) {
-      parts.add(h.textBn);
-    } else {
-      if (h.textEn != null) parts.add(h.textEn!);
-    }
+    if (h.arabicText != null) parts.add(h.arabicText!);
+    parts.add(isBn ? h.banglaTranslation : h.englishTranslation);
     parts.add('— ${h.source} (${isBn ? 'হাদিস' : 'Hadith'} #${h.hadithNumber})');
     return parts.join('\n\n');
   }
@@ -84,46 +96,50 @@ class _HadithBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Decorative header
+          // Decorative header card
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [AppColors.primaryGreen, Color(0xFF2D6A4F)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
+                colors: [AppColors.dome, Color(0xFF112A1C)],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.domeBd),
             ),
-            child: Column(
+            child: Stack(
               children: [
-                const Text(
-                  '📖',
-                  style: TextStyle(fontSize: 32),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  isBn ? 'হাদিস #${hadith.hadithNumber}' : 'Hadith #${hadith.hadithNumber}',
-                  style: const TextStyle(
-                    color: AppColors.gold,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  hadith.source,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
+                const StarfieldWidget(count: 10),
+                Column(
+                  children: [
+                    Text(
+                      isBn
+                          ? 'হাদিস #${hadith.hadithNumber}'
+                          : 'Hadith #${hadith.hadithNumber}',
+                      style: const TextStyle(
+                        fontFamily: 'NotoSansBengali',
+                        color: AppColors.goldWarm,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      hadith.source,
+                      style: const TextStyle(
+                        fontFamily: 'AmiriQuran',
+                        fontSize: 16,
+                        color: AppColors.marble,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -132,53 +148,57 @@ class _HadithBody extends StatelessWidget {
           const SizedBox(height: 20),
 
           // Arabic text
-          if (hadith.textArabic != null)
+          if (hadith.arabicText != null) ...[
             _ContentBlock(
               label: isBn ? 'আরবি' : 'Arabic',
-              labelColor: AppColors.gold,
+              labelColor: AppColors.goldWarm,
               child: Directionality(
                 textDirection: TextDirection.rtl,
                 child: Text(
-                  hadith.textArabic!,
+                  hadith.arabicText!,
                   style: const TextStyle(
                     fontFamily: 'AmiriQuran',
                     fontSize: 22,
-                    height: 2.0,
-                    color: AppColors.primaryGreen,
+                    height: 2.1,
+                    color: AppColors.marble,
                   ),
                   textAlign: TextAlign.justify,
                 ),
               ),
             ),
-
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
           // Bangla text
           _ContentBlock(
             label: isBn ? 'বাংলা অনুবাদ' : 'Bangla Translation',
-            labelColor: AppColors.primaryGreen,
+            labelColor: AppColors.domePale,
             child: Text(
-              hadith.textBn,
-              style: theme.textTheme.bodyLarge?.copyWith(height: 1.7),
+              hadith.banglaTranslation,
+              style: const TextStyle(
+                fontFamily: 'NotoSansBengali',
+                fontSize: 14,
+                color: AppColors.sand,
+                height: 1.75,
+              ),
             ),
           ),
 
           // English text
-          if (hadith.textEn != null) ...[
-            const SizedBox(height: 16),
-            _ContentBlock(
-              label: 'English Translation',
-              labelColor: Colors.blueGrey,
-              child: Text(
-                '"${hadith.textEn!}"',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontStyle: FontStyle.italic,
-                  height: 1.6,
-                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
-                ),
+          const SizedBox(height: 16),
+          _ContentBlock(
+            label: 'English Translation',
+            labelColor: AppColors.sandMid,
+            child: Text(
+              '"${hadith.englishTranslation}"',
+              style: const TextStyle(
+                fontSize: 13,
+                fontStyle: FontStyle.italic,
+                height: 1.65,
+                color: AppColors.sandMid,
               ),
             ),
-          ],
+          ),
 
           const SizedBox(height: 24),
 
@@ -186,35 +206,34 @@ class _HadithBody extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.gold.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.gold.withOpacity(0.3)),
+              color: AppColors.goldGlow,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.goldBd),
             ),
             child: Row(
               children: [
-                const Icon(Icons.auto_stories, color: AppColors.gold, size: 20),
+                const Icon(Icons.auto_stories, color: AppColors.goldWarm, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        hadith.source,
+                        hadith.bookName,
                         style: const TextStyle(
+                          fontFamily: 'NotoSansBengali',
                           fontWeight: FontWeight.w700,
-                          color: AppColors.gold,
+                          color: AppColors.goldWarm,
+                          fontSize: 13,
                         ),
                       ),
                       if (hadith.narrator != null)
                         Text(
                           '${isBn ? 'বর্ণনাকারী:' : 'Narrator:'} ${hadith.narrator}',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      if (hadith.grade != null)
-                        Text(
-                          '${isBn ? 'মান:' : 'Grade:'} ${hadith.grade}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppColors.success,
+                          style: const TextStyle(
+                            fontFamily: 'NotoSansBengali',
+                            fontSize: 11,
+                            color: AppColors.sandMid,
                           ),
                         ),
                     ],

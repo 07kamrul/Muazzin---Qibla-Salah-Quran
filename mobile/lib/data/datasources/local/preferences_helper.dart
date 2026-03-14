@@ -13,9 +13,10 @@ class PreferencesHelper {
 
   static const _kSettings       = 'user_settings';
   static const _kLocation       = 'cached_location';
-  static const _kLastHadithDate = 'last_hadith_date';
-  static const _kAuthToken      = 'auth_access_token';
-  static const _kRefreshToken   = 'auth_refresh_token';
+  static const _kLastHadithDate  = 'last_hadith_date';
+  static const _kMosqueSyncTime  = 'mosque_sync_time';
+  static const _kAuthToken       = 'auth_access_token';
+  static const _kRefreshToken    = 'auth_refresh_token';
 
   Future<void> init() async => _prefs ??= await SharedPreferences.getInstance();
 
@@ -63,6 +64,16 @@ class PreferencesHelper {
 
   Future<DateTime?> loadLastHadithDate() async {
     final raw = (await _p).getString(_kLastHadithDate);
+    return raw != null ? DateTime.tryParse(raw) : null;
+  }
+
+  // ── Mosque sync ───────────────────────────────────────────────────────────
+
+  Future<void> setMosqueSyncTime(DateTime d) async =>
+      (await _p).setString(_kMosqueSyncTime, d.toIso8601String());
+
+  Future<DateTime?> getMosqueSyncTime() async {
+    final raw = (await _p).getString(_kMosqueSyncTime);
     return raw != null ? DateTime.tryParse(raw) : null;
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../data/models/prayer_times_model.dart';
 import '../../providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -115,7 +116,7 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.timer,
             title: isBn ? 'আগাম সতর্কতা' : 'Pre-alert Timing',
             trailing: DropdownButton<int>(
-              value: settings.preAlertMinutes,
+              value: settings.notifications.preAlertMinutes,
               underline: const SizedBox.shrink(),
               items: [0, 5, 10, 15, 30].map((m) => DropdownMenuItem(
                 value: m,
@@ -134,37 +135,37 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.brightness_3,
             title: isBn ? 'ফজর' : 'Fajr',
             value: settings.notifications.fajr,
-            onChanged: (v) => notifier.setNotification('fajr', v),
+            onChanged: (v) => notifier.togglePrayerNotification(PrayerEntry.fajr, v),
           ),
           _NotifSwitch(
             icon: Icons.wb_sunny,
             title: isBn ? 'যোহর' : 'Dhuhr',
             value: settings.notifications.dhuhr,
-            onChanged: (v) => notifier.setNotification('dhuhr', v),
+            onChanged: (v) => notifier.togglePrayerNotification(PrayerEntry.dhuhr, v),
           ),
           _NotifSwitch(
             icon: Icons.wb_sunny_outlined,
             title: isBn ? 'আসর' : 'Asr',
             value: settings.notifications.asr,
-            onChanged: (v) => notifier.setNotification('asr', v),
+            onChanged: (v) => notifier.togglePrayerNotification(PrayerEntry.asr, v),
           ),
           _NotifSwitch(
             icon: Icons.nights_stay,
             title: isBn ? 'মাগরিব' : 'Maghrib',
             value: settings.notifications.maghrib,
-            onChanged: (v) => notifier.setNotification('maghrib', v),
+            onChanged: (v) => notifier.togglePrayerNotification(PrayerEntry.maghrib, v),
           ),
           _NotifSwitch(
             icon: Icons.dark_mode,
             title: isBn ? 'ইশা' : 'Isha',
             value: settings.notifications.isha,
-            onChanged: (v) => notifier.setNotification('isha', v),
+            onChanged: (v) => notifier.togglePrayerNotification(PrayerEntry.isha, v),
           ),
           _NotifSwitch(
             icon: Icons.auto_awesome,
             title: isBn ? 'দৈনিক হাদিস' : 'Daily Hadith',
-            value: settings.notifications.hadith,
-            onChanged: (v) => notifier.setNotification('hadith', v),
+            value: settings.notifications.hadithAlert,
+            onChanged: (v) => notifier.toggleHadithAlert(v),
           ),
 
           // ── Ramadan ───────────────────────────────────────────────────────
@@ -173,14 +174,14 @@ class SettingsScreen extends ConsumerWidget {
           _NotifSwitch(
             icon: Icons.restaurant,
             title: isBn ? 'সেহরির সতর্কতা' : 'Sehri Alert',
-            value: settings.notifications.sehri,
-            onChanged: (v) => notifier.setNotification('sehri', v),
+            value: settings.notifications.sehriAlert,
+            onChanged: (v) => notifier.toggleSehriAlert(v),
           ),
           _NotifSwitch(
             icon: Icons.nightlight_round,
             title: isBn ? 'ইফতারের সতর্কতা' : 'Iftar Alert',
-            value: settings.notifications.iftar,
-            onChanged: (v) => notifier.setNotification('iftar', v),
+            value: settings.notifications.iftarAlert,
+            onChanged: (v) => notifier.toggleIftarAlert(v),
           ),
 
           // ── Quran Reader ─────────────────────────────────────────────────

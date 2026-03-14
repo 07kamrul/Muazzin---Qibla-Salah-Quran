@@ -6,10 +6,10 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../core/utils/hijri_calendar.dart';
 import '../../../data/datasources/local/database_helper.dart';
-import '../../../data/models/prayer_times_model.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/prayer_times_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../widgets/haramain_atoms.dart';
 import 'widgets/countdown_timer.dart';
 import 'widgets/hadith_card.dart';
 import 'widgets/prayer_time_card.dart';
@@ -19,63 +19,85 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings    = ref.watch(settingsProvider);
-    final lang        = settings.language;
-    final timesAsync  = ref.watch(prayerTimesProvider);
-    final locAsync    = ref.watch(locationProvider);
-    final nextAsync   = ref.watch(nextPrayerProvider);
-    final countdown   = ref.watch(countdownProvider);
+    final settings   = ref.watch(settingsProvider);
+    final lang       = settings.language;
+    final timesAsync = ref.watch(prayerTimesProvider);
+    final locAsync   = ref.watch(locationProvider);
+    final nextAsync  = ref.watch(nextPrayerProvider);
+    final countdown  = ref.watch(countdownProvider);
 
-    final today  = DateTime.now();
-    final hijri  = HijriCalendarUtil.fromGregorian(today);
-    final isRam  = HijriCalendarUtil.isRamadan(today);
+    final today = DateTime.now();
+    final isRam = HijriCalendarUtil.isRamadan(today);
 
     return Scaffold(
+      backgroundColor: AppColors.sky0,
       appBar: AppBar(
+        backgroundColor: AppColors.sky1,
+        foregroundColor: AppColors.marble,
+        elevation: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               lang == 'bn' ? 'মুয়াজ্জিন' : 'Muazzin',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                fontFamily: 'NotoSansBengali',
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: AppColors.marble,
+              ),
             ),
             Text(
               '${HijriCalendarUtil.formatHijri(today, lang)}  •  ${Formatting.formatDate(today, lang)}',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
+              style: const TextStyle(
+                fontFamily: 'NotoSansBengali',
+                fontSize: 11,
+                fontWeight: FontWeight.w400,
+                color: AppColors.sand,
+              ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location_rounded),
+            icon: const Icon(Icons.my_location_rounded, color: AppColors.goldWarm),
             tooltip: lang == 'bn' ? 'অবস্থান আপডেট' : 'Refresh location',
             onPressed: () => ref.read(locationProvider.notifier).refresh(),
           ),
           if (isRam)
             IconButton(
-              icon: const Icon(Icons.crescent_moon_rounded),
+              icon: const Icon(Icons.nightlight_round, color: AppColors.goldWarm),
               tooltip: lang == 'bn' ? 'রমজান' : 'Ramadan',
               onPressed: () => Navigator.of(context).pushNamed('/ramadan'),
             ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: AppColors.goldBd),
+        ),
       ),
       body: RefreshIndicator(
+        color: AppColors.goldWarm,
+        backgroundColor: AppColors.sky2,
         onRefresh: () => ref.read(locationProvider.notifier).refresh(),
         child: CustomScrollView(
           slivers: [
             // Location banner
             SliverToBoxAdapter(
               child: locAsync.when(
-                loading: () => _locationShimmer(),
+                loading: _locationShimmer,
                 error: (e, _) => _locationError(e.toString(), lang),
                 data: (loc) => _LocationBanner(loc: '${loc.district}, ${loc.division}'),
               ),
             ),
 
+            // Starfield decoration
+            const SliverToBoxAdapter(child: SizedBox.shrink()),
+
             // Next prayer countdown
             SliverToBoxAdapter(
               child: nextAsync.when(
-                loading: () => _countdownShimmer(),
+                loading: _countdownShimmer,
                 error: (_, __) => const SizedBox.shrink(),
                 data: (next) => _NextPrayerCard(
                   prayerName: lang == 'bn'
@@ -93,9 +115,7 @@ class HomeScreen extends ConsumerWidget {
 
             // Ramadan banner
             if (isRam || settings.ramadanMode)
-              SliverToBoxAdapter(
-                child: _RamadanBanner(lang: lang),
-              ),
+              SliverToBoxAdapter(child: _RamadanBanner(lang: lang)),
 
             // Prayer times list
             timesAsync.when(
@@ -106,7 +126,10 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               error: (e, _) => SliverToBoxAdapter(
-                child: Center(child: Text(e.toString())),
+                child: Center(
+                  child: Text(e.toString(),
+                      style: const TextStyle(color: AppColors.marble)),
+                ),
               ),
               data: (times) {
                 final now     = DateTime.now();
@@ -132,6 +155,9 @@ class HomeScreen extends ConsumerWidget {
               },
             ),
 
+            // Arabesque divider
+            const SliverToBoxAdapter(child: ArabesqueBorder()),
+
             // Daily Hadith card
             SliverToBoxAdapter(
               child: FutureBuilder(
@@ -153,13 +179,20 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _locationShimmer() => Shimmer.fromColors(
-    baseColor: Colors.grey.shade300,
-    highlightColor: Colors.grey.shade100,
-    child: Container(height: 40, margin: const EdgeInsets.all(16), color: Colors.white),
+  static Widget _locationShimmer() => Shimmer.fromColors(
+    baseColor: AppColors.sky3,
+    highlightColor: AppColors.sky4,
+    child: Container(
+      height: 40,
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.sky3,
+        borderRadius: BorderRadius.circular(8),
+      ),
+    ),
   );
 
-  Widget _locationError(String msg, String lang) => Padding(
+  static Widget _locationError(String msg, String lang) => Padding(
     padding: const EdgeInsets.all(16),
     child: Text(
       lang == 'bn' ? 'অবস্থান পাওয়া যায়নি' : 'Location unavailable',
@@ -167,16 +200,30 @@ class HomeScreen extends ConsumerWidget {
     ),
   );
 
-  Widget _countdownShimmer() => Shimmer.fromColors(
-    baseColor: Colors.grey.shade300,
-    highlightColor: Colors.grey.shade100,
-    child: Container(height: 120, margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), color: Colors.white),
+  static Widget _countdownShimmer() => Shimmer.fromColors(
+    baseColor: AppColors.sky3,
+    highlightColor: AppColors.sky4,
+    child: Container(
+      height: 120,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.sky3,
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
   );
 
-  Widget _prayerShimmer() => Shimmer.fromColors(
-    baseColor: Colors.grey.shade300,
-    highlightColor: Colors.grey.shade100,
-    child: Container(height: 60, margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4), color: Colors.white),
+  static Widget _prayerShimmer() => Shimmer.fromColors(
+    baseColor: AppColors.sky3,
+    highlightColor: AppColors.sky4,
+    child: Container(
+      height: 60,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.sky3,
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
   );
 }
 
@@ -188,12 +235,19 @@ class _LocationBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
     child: Row(
       children: [
-        const Icon(Icons.location_on, size: 16, color: AppColors.gold),
+        const Icon(Icons.location_on, size: 16, color: AppColors.goldWarm),
         const SizedBox(width: 4),
-        Text(loc, style: Theme.of(context).textTheme.bodyMedium),
+        Text(
+          loc,
+          style: const TextStyle(
+            fontFamily: 'NotoSansBengali',
+            color: AppColors.sand,
+            fontSize: 13,
+          ),
+        ),
       ],
     ),
   );
@@ -210,27 +264,65 @@ class _NextPrayerCard extends StatelessWidget {
   final String   lang;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.all(16),
-    color: AppColors.primaryGreen,
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      child: Column(
-        children: [
-          Text(
-            lang == 'bn' ? 'পরবর্তী নামাজ' : 'Next Prayer',
-            style: const TextStyle(color: Colors.white70, fontSize: 13),
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.sky2, AppColors.sky3],
           ),
-          const SizedBox(height: 4),
-          Text(
-            prayerName,
-            style: const TextStyle(color: AppColors.gold, fontSize: 22, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          CountdownTimer(remaining: countdown, lang: lang, large: true),
-        ],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.goldBd),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.domeGlow,
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              lang == 'bn' ? 'পরবর্তী নামাজ' : 'Next Prayer',
+              style: const TextStyle(
+                fontFamily: 'NotoSansBengali',
+                color: AppColors.sand,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              prayerName,
+              style: const TextStyle(
+                fontFamily: 'NotoSansBengali',
+                color: AppColors.goldWarm,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            CountdownTimer(remaining: countdown, lang: lang, large: true),
+          ],
+        ),
       ),
-    ),
+      Positioned(
+        top: 12,
+        right: 16,
+        child: Opacity(
+          opacity: 0.15,
+          child: MosqueSilhouette(
+            width: 100,
+            color: AppColors.goldPale,
+            opacity: 1,
+          ),
+        ),
+      ),
+    ],
   );
 }
 
@@ -243,17 +335,26 @@ class _RamadanBanner extends StatelessWidget {
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     decoration: BoxDecoration(
-      color: AppColors.gold.withOpacity(0.15),
+      color: AppColors.goldGlow,
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: AppColors.gold.withOpacity(0.5)),
+      border: Border.all(color: AppColors.goldBd),
     ),
     child: Row(
       children: [
-        const Text('🌙', style: TextStyle(fontSize: 20)),
+        const OctaStar(size: 18, color: AppColors.goldWarm),
         const SizedBox(width: 10),
-        Text(
-          lang == 'bn' ? 'রমজান মোবারক — সেহরি ও ইফতারের সময় দেখতে ট্যাপ করুন' : 'Ramadan Mubarak — Tap to see Sehri & Iftar times',
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        Expanded(
+          child: Text(
+            lang == 'bn'
+                ? 'রমজান মোবারক — সেহরি ও ইফতারের সময় দেখতে ট্যাপ করুন'
+                : 'Ramadan Mubarak — Tap to see Sehri & Iftar times',
+            style: const TextStyle(
+              fontFamily: 'NotoSansBengali',
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.goldWarm,
+            ),
+          ),
         ),
       ],
     ),

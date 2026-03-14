@@ -5,13 +5,15 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../data/datasources/local/database_helper.dart';
+import '../../../data/datasources/remote/api_client.dart';
 import '../../../data/models/surah_model.dart';
 import '../../providers/settings_provider.dart';
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 final surahListProvider = FutureProvider<List<SurahModel>>((ref) async {
-  return DatabaseHelper.instance.getAllSurahs();
+  final maps = await ApiClient().getSurahs();
+  return maps.map(SurahModel.fromJson).toList();
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -99,8 +101,8 @@ class _QuranScreenState extends ConsumerState<QuranScreen>
                         ? surahs
                         : surahs.where((s) =>
                             s.nameArabic.contains(_searchQuery) ||
-                            s.nameBn.contains(_searchQuery) ||
-                            s.nameEn.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                            s.nameBangla.contains(_searchQuery) ||
+                            s.nameEnglish.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                             s.number.toString() == _searchQuery).toList();
 
                     return ListView.builder(
@@ -170,7 +172,7 @@ class _SurahListItem extends StatelessWidget {
               child: Center(
                 child: Text(
                   isBn
-                      ? Formatting.toBanglaDigits(surah.number)
+                      ? Formatting.toBanglaDigits(surah.number.toString())
                       : '${surah.number}',
                   style: TextStyle(
                     color: AppColors.primaryGreen,
@@ -188,13 +190,13 @@ class _SurahListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isBn ? surah.nameBn : surah.nameEn,
+                    isBn ? surah.nameBangla : surah.nameEnglish,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   Text(
-                    '${isBn ? Formatting.toBanglaDigits(surah.totalAyahs) : surah.totalAyahs} '
+                    '${isBn ? Formatting.toBanglaDigits(surah.ayahCount.toString()) : surah.ayahCount} '
                     '${isBn ? 'আয়াত' : 'verses'} · '
                     '${isBn ? _revelationTypeBn(surah.revelationType) : surah.revelationType.name}',
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -234,7 +236,7 @@ class _BookmarksTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: DatabaseHelper.instance.getBookmarks(),
+      future: DatabaseHelper.instance.getBookmarks('ayah').then((ids) => ids.map((id) => <String, dynamic>{'id': id}).toList()),
       builder: (context, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: AppColors.primaryGreen));
@@ -284,7 +286,7 @@ class _BookmarksTab extends ConsumerWidget {
                 icon: const Icon(Icons.delete_outline, size: 18),
                 onPressed: () async {
                   await DatabaseHelper.instance
-                      .removeBookmark(b['id'] as int);
+                      .removeBookmark('ayah', b['id'] as String);
                 },
               ),
             );

@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,8 +25,15 @@ class QiblaScreen extends ConsumerWidget {
     });
 
     return Scaffold(
+      backgroundColor: AppColors.sky0,
       appBar: AppBar(
-        title: Text(lang == 'bn' ? 'কিবলার দিক' : 'Qibla Direction'),
+        backgroundColor: AppColors.sky1,
+        foregroundColor: AppColors.marble,
+        elevation: 0,
+        title: Text(
+          lang == 'bn' ? 'কিবলার দিক' : 'Qibla Direction',
+          style: const TextStyle(fontFamily: 'NotoSansBengali', color: AppColors.marble),
+        ),
       ),
       body: qState == null
           ? _buildLoading(lang)
@@ -40,9 +45,12 @@ class QiblaScreen extends ConsumerWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const CircularProgressIndicator(color: AppColors.primaryGreen),
+        const CircularProgressIndicator(color: AppColors.goldWarm),
         const SizedBox(height: 16),
-        Text(lang == 'bn' ? 'কম্পাস লোড হচ্ছে...' : 'Loading compass...'),
+        Text(
+          lang == 'bn' ? 'কম্পাস লোড হচ্ছে...' : 'Loading compass...',
+          style: const TextStyle(color: AppColors.sand),
+        ),
       ],
     ),
   );
@@ -67,11 +75,11 @@ class QiblaScreen extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           decoration: BoxDecoration(
             color: qState.isAligned
-                ? AppColors.success.withOpacity(0.15)
-                : AppColors.gold.withOpacity(0.08),
+                ? AppColors.domeGlow
+                : AppColors.goldGlow,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: qState.isAligned ? AppColors.success : AppColors.gold,
+              color: qState.isAligned ? AppColors.domePale : AppColors.goldWarm,
             ),
           ),
           child: Text(
@@ -80,7 +88,7 @@ class QiblaScreen extends ConsumerWidget {
                 : (lang == 'bn' ? 'ডিভাইস ঘুরান' : 'Rotate device'),
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              color: qState.isAligned ? AppColors.success : AppColors.gold,
+              color: qState.isAligned ? AppColors.domePale : AppColors.goldWarm,
             ),
           ),
         ),
@@ -108,13 +116,13 @@ class QiblaScreen extends ConsumerWidget {
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primaryGreen,
+                  color: AppColors.goldWarm,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 lang == 'bn' ? 'কাবার দিক' : 'Direction to Kaaba',
-                style: const TextStyle(color: AppColors.lightTextMuted, fontSize: 13),
+                style: const TextStyle(fontFamily: 'NotoSansBengali', color: AppColors.sandMid, fontSize: 13),
               ),
             ],
           ),
@@ -124,7 +132,7 @@ class QiblaScreen extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.only(bottom: 24),
           child: TextButton.icon(
-            icon: const Icon(Icons.360_rounded),
+            icon: const Icon(Icons.rotate_right_rounded),
             label: Text(lang == 'bn' ? 'ক্যালিব্রেট করুন' : 'Calibrate'),
             onPressed: () => _showCalibrationDialog(context, lang),
           ),

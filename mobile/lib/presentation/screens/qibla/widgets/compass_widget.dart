@@ -31,10 +31,10 @@ class CompassWidget extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: isAligned
-                ? [BoxShadow(color: AppColors.success.withOpacity(0.5), blurRadius: 24, spreadRadius: 4)]
+                ? [BoxShadow(color: AppColors.domeGlow, blurRadius: 24, spreadRadius: 4)]
                 : [],
             border: Border.all(
-              color: isAligned ? AppColors.success : AppColors.gold.withOpacity(0.3),
+              color: isAligned ? AppColors.domePale : AppColors.goldBd,
               width: 3,
             ),
           ),
@@ -93,7 +93,7 @@ class CompassWidget extends StatelessWidget {
         Container(
           width: 12, height: 12,
           decoration: const BoxDecoration(
-            color: AppColors.primaryGreen,
+            color: AppColors.goldWarm,
             shape: BoxShape.circle,
           ),
         ),
@@ -108,10 +108,10 @@ class _CompassPainter extends CustomPainter {
     final center  = Offset(size.width / 2, size.height / 2);
     final radius  = size.width / 2;
     final paint   = Paint()
-      ..color     = AppColors.primaryGreen.withOpacity(0.15)
+      ..color     = AppColors.sky3
       ..style     = PaintingStyle.fill;
     final border  = Paint()
-      ..color     = AppColors.primaryGreen.withOpacity(0.4)
+      ..color     = AppColors.domeBd
       ..style     = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
@@ -121,7 +121,7 @@ class _CompassPainter extends CustomPainter {
 
     // Cardinal marks
     final textStyle = TextStyle(
-      color: AppColors.primaryGreen,
+      color: AppColors.marble,
       fontSize: radius * 0.13,
       fontWeight: FontWeight.w700,
     );
@@ -145,7 +145,7 @@ class _CompassPainter extends CustomPainter {
 
     // Tick marks
     final tickPaint = Paint()
-      ..color = AppColors.primaryGreen.withOpacity(0.5)
+      ..color = AppColors.sandMid
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
 

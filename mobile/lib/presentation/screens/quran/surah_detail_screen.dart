@@ -5,14 +5,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/utils/formatting.dart';
 import '../../../data/datasources/local/database_helper.dart';
+import '../../../data/datasources/remote/api_client.dart';
 import '../../../data/models/surah_model.dart';
 import '../../providers/settings_provider.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final surahDetailProvider =
-    FutureProvider.family<SurahModel?, int>((ref, surahNumber) async {
-  return DatabaseHelper.instance.getSurahWithAyahs(surahNumber);
+/// Returns (SurahModel, List<AyahModel>) fetched from the API.
+final surahDetailProvider = FutureProvider.family<
+    (SurahModel, List<AyahModel>), int>((ref, surahNumber) async {
+  final data = await ApiClient().getSurah(surahNumber);
+  final surah = SurahModel.fromJson(data);
+  final ayahsRaw = data['ayahs'] as List<dynamic>? ?? [];
+  final ayahs = ayahsRaw
+      .map((a) => AyahModel.fromJson(a as Map<String, dynamic>))
+      .toList();
+  return (surah, ayahs);
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -28,7 +36,7 @@ class SurahDetailScreen extends ConsumerStatefulWidget {
 
 class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
   final _scrollController = ScrollController();
-  Set<int> _bookmarked = {};
+  Set<String> _bookmarked = {};
 
   @override
   void initState() {
@@ -37,45 +45,47 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
   }
 
   Future<void> _loadBookmarks() async {
-    final bookmarks = await DatabaseHelper.instance
-        .getBookmarksForSurah(widget.surahNumber);
+    final bookmarks = await DatabaseHelper.instance.getBookmarks('ayah');
+    final prefix = '${widget.surahNumber}_';
     if (mounted) {
       setState(() {
-        _bookmarked = bookmarks.map((b) => b['ayah_number'] as int).toSet();
+        _bookmarked = bookmarks.where((id) => id.startsWith(prefix)).toSet();
       });
     }
   }
 
+  String _ayahId(int ayahNumber) => '${widget.surahNumber}_$ayahNumber';
+
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(settingsProvider);
-    final lang     = settings.language;
-    final isBn     = lang == 'bn';
-    final display  = settings.quranDisplayMode; // 'arabic_only', 'arabic_bn', 'arabic_en', 'all'
+    final settings  = ref.watch(settingsProvider);
+    final lang      = settings.language;
+    final isBn      = lang == 'bn';
+    final display   = settings.quranDisplayMode;
 
     final surahAsync = ref.watch(surahDetailProvider(widget.surahNumber));
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: AppColors.sky0,
       body: surahAsync.when(
         loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryGreen),
+          child: CircularProgressIndicator(color: AppColors.goldWarm),
         ),
-        error: (e, _) => Center(child: Text('$e')),
-        data: (surah) {
-          if (surah == null) {
-            return Center(
-              child: Text(isBn ? 'সূরা পাওয়া যায়নি' : 'Surah not found'),
-            );
-          }
+        error: (e, _) => Center(
+          child: Text('$e', style: const TextStyle(color: AppColors.marble)),
+        ),
+        data: (record) {
+          final (surah, ayahs) = record;
 
           return CustomScrollView(
             controller: _scrollController,
             slivers: [
-              // App bar with surah info
+              // App bar
               SliverAppBar(
                 expandedHeight: 140,
                 pinned: true,
+                backgroundColor: AppColors.sky1,
+                foregroundColor: AppColors.marble,
                 flexibleSpace: FlexibleSpaceBar(
                   centerTitle: true,
                   background: Container(
@@ -83,7 +93,7 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [AppColors.primaryGreen, Color(0xFF2D6A4F)],
+                        colors: [AppColors.sky1, AppColors.sky3],
                       ),
                     ),
                     child: SafeArea(
@@ -96,23 +106,25 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
                             style: const TextStyle(
                               fontFamily: 'AmiriQuran',
                               fontSize: 32,
-                              color: AppColors.gold,
+                              color: AppColors.goldWarm,
                             ),
                           ),
                           Text(
-                            isBn ? surah.nameBn : surah.nameEn,
+                            isBn ? surah.nameBangla : surah.nameEnglish,
                             style: const TextStyle(
-                              color: Colors.white,
+                              fontFamily: 'NotoSansBengali',
+                              color: AppColors.marble,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           Text(
-                            '${isBn ? Formatting.toBanglaDigits(surah.totalAyahs) : surah.totalAyahs}'
+                            '${isBn ? Formatting.toBanglaDigits(surah.ayahCount.toString()) : surah.ayahCount}'
                             ' ${isBn ? 'আয়াত' : 'Verses'} · '
                             '${isBn ? _revelationTypeBn(surah.revelationType) : surah.revelationType.name}',
                             style: const TextStyle(
-                              color: Colors.white70,
+                              fontFamily: 'NotoSansBengali',
+                              color: AppColors.sand,
                               fontSize: 13,
                             ),
                           ),
@@ -129,12 +141,17 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.goldBd),
+                      ),
+                    ),
                     child: const Text(
                       'بِسْمِ اللّٰهِ الرَّحْمٰنِ الرَّحِيْمِ',
                       style: TextStyle(
                         fontFamily: 'AmiriQuran',
                         fontSize: 26,
-                        color: AppColors.primaryGreen,
+                        color: AppColors.goldWarm,
                       ),
                       textDirection: TextDirection.rtl,
                     ),
@@ -145,17 +162,17 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, i) {
-                    final ayah = surah.ayahs[i];
+                    final ayah = ayahs[i];
+                    final id   = _ayahId(ayah.ayahNumber);
                     return _AyahCard(
-                      ayah: ayah,
-                      surahNumber: surah.number,
-                      isBn: isBn,
-                      displayMode: display,
-                      isBookmarked: _bookmarked.contains(ayah.number),
+                      ayah:            ayah,
+                      isBn:            isBn,
+                      displayMode:     display,
+                      isBookmarked:    _bookmarked.contains(id),
                       onBookmarkToggle: () => _toggleBookmark(ayah),
                     );
                   },
-                  childCount: surah.ayahs.length,
+                  childCount: ayahs.length,
                 ),
               ),
 
@@ -168,18 +185,14 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
   }
 
   Future<void> _toggleBookmark(AyahModel ayah) async {
-    final isBookmarked = _bookmarked.contains(ayah.number);
+    final id           = _ayahId(ayah.ayahNumber);
+    final isBookmarked = _bookmarked.contains(id);
     if (isBookmarked) {
-      await DatabaseHelper.instance.removeBookmarkByAyah(
-        widget.surahNumber, ayah.number,
-      );
-      setState(() => _bookmarked.remove(ayah.number));
+      await DatabaseHelper.instance.removeBookmark('ayah', id);
+      setState(() => _bookmarked.remove(id));
     } else {
-      await DatabaseHelper.instance.addBookmark(
-        surahNumber: widget.surahNumber,
-        ayahNumber: ayah.number,
-      );
-      setState(() => _bookmarked.add(ayah.number));
+      await DatabaseHelper.instance.addBookmark('ayah', id);
+      setState(() => _bookmarked.add(id));
     }
   }
 
@@ -192,38 +205,36 @@ class _SurahDetailScreenState extends ConsumerState<SurahDetailScreen> {
 class _AyahCard extends StatelessWidget {
   const _AyahCard({
     required this.ayah,
-    required this.surahNumber,
     required this.isBn,
     required this.displayMode,
     required this.isBookmarked,
     required this.onBookmarkToggle,
   });
 
-  final AyahModel ayah;
-  final int       surahNumber;
-  final bool      isBn;
-  final String    displayMode; // 'arabic_only' | 'arabic_bn' | 'arabic_en' | 'all'
-  final bool      isBookmarked;
+  final AyahModel    ayah;
+  final bool         isBn;
+  final String       displayMode;
+  final bool         isBookmarked;
   final VoidCallback onBookmarkToggle;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     final showBn = displayMode == 'arabic_bn' || displayMode == 'all';
     final showEn = displayMode == 'arabic_en' || displayMode == 'all';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: theme.cardColor,
+        color: AppColors.sky2,
         borderRadius: BorderRadius.circular(12),
-        border: isBookmarked
-            ? Border.all(color: AppColors.gold.withOpacity(0.5))
-            : null,
+        border: Border.all(
+          color: isBookmarked
+              ? AppColors.goldWarm.withOpacity(0.5)
+              : AppColors.goldBd,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(0.25),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -236,23 +247,24 @@ class _AyahCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
-                // Ayah number medallion
                 Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: AppColors.primaryGreen.withOpacity(0.12),
+                    color: AppColors.dome.withOpacity(0.25),
                     shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.domeBd),
                   ),
                   child: Center(
                     child: Text(
                       isBn
-                          ? Formatting.toBanglaDigits(ayah.number)
-                          : '${ayah.number}',
+                          ? Formatting.toBanglaDigits(ayah.ayahNumber.toString())
+                          : '${ayah.ayahNumber}',
                       style: const TextStyle(
+                        fontFamily: 'NotoSansBengali',
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primaryGreen,
+                        color: AppColors.domePale,
                       ),
                     ),
                   ),
@@ -262,7 +274,7 @@ class _AyahCard extends StatelessWidget {
                 IconButton(
                   icon: Icon(
                     isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                    color: isBookmarked ? AppColors.gold : Colors.grey,
+                    color: isBookmarked ? AppColors.goldWarm : AppColors.sandMid,
                     size: 20,
                   ),
                   onPressed: onBookmarkToggle,
@@ -271,11 +283,15 @@ class _AyahCard extends StatelessWidget {
                 ),
                 // Copy arabic
                 IconButton(
-                  icon: const Icon(Icons.copy, size: 18, color: Colors.grey),
+                  icon: const Icon(Icons.copy, size: 18, color: AppColors.sandMid),
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: ayah.textArabic));
+                    Clipboard.setData(ClipboardData(text: ayah.arabicText));
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(isBn ? 'আরবি কপি হয়েছে' : 'Arabic copied'),
+                      backgroundColor: AppColors.sky3,
+                      content: Text(
+                        isBn ? 'আরবি কপি হয়েছে' : 'Arabic copied',
+                        style: const TextStyle(color: AppColors.marble),
+                      ),
                       duration: const Duration(seconds: 1),
                     ));
                   },
@@ -292,12 +308,12 @@ class _AyahCard extends StatelessWidget {
             child: Directionality(
               textDirection: TextDirection.rtl,
               child: Text(
-                ayah.textArabic,
+                ayah.arabicText,
                 style: const TextStyle(
                   fontFamily: 'AmiriQuran',
                   fontSize: 22,
                   height: 2.0,
-                  color: AppColors.primaryGreen,
+                  color: AppColors.marble,
                 ),
                 textAlign: TextAlign.justify,
               ),
@@ -305,23 +321,29 @@ class _AyahCard extends StatelessWidget {
           ),
 
           // Bangla translation
-          if (showBn && ayah.translationBn != null)
+          if (showBn && ayah.banglaTranslation.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
               child: Text(
-                ayah.translationBn!,
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.6),
+                ayah.banglaTranslation,
+                style: const TextStyle(
+                  fontFamily: 'NotoSansBengali',
+                  fontSize: 14,
+                  height: 1.6,
+                  color: AppColors.sand,
+                ),
               ),
             ),
 
           // English translation
-          if (showEn && ayah.translationEn != null)
+          if (showEn && ayah.englishTranslation.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: Text(
-                '"${ayah.translationEn!}"',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.textTheme.bodySmall?.color?.withOpacity(0.7),
+                '"${ayah.englishTranslation}"',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.sandMid,
                   fontStyle: FontStyle.italic,
                   height: 1.5,
                 ),
